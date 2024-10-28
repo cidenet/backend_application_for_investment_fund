@@ -27,15 +27,17 @@ class TestMongoFundRepository(unittest.TestCase):
             category="FPV"
         )
         fund_id = self.repository.create_fund(fund)
-        self.assertEqual(fund_id, '12345678-1234-5678-1234-567812345678')     
+        self.assertEqual(fund_id, '12345678-1234-5678-1234-567812345678')
 
     @patch('app.repositories.mongo_fund_repository.db')
     def test_create_fund_pymongo_error(self, mock_db):
-        mock_db.funds.insert_one.side_effect = PyMongoError(DataBaseError.ERROR_DB_CONNECTION)
+        mock_db.funds.insert_one.side_effect = PyMongoError(
+            DataBaseError.ERROR_DB_CONNECTION
+        )
         fund = Fund(
-            name="Test Fund", 
+            name="Test Fund",
             minimum_investment_amount=10000,
-            category="FPV"            
+            category="FPV"
         )
         with self.assertRaises(HTTPException) as context:
             self.repository.create_fund(fund)
@@ -44,7 +46,11 @@ class TestMongoFundRepository(unittest.TestCase):
 
     @patch('app.repositories.mongo_fund_repository.db')
     def test_get_fund_success(self, mock_db):
-        mock_db.funds.find_one.return_value = {"id": "1234", "name": "Test Fund", "_id": MagicMock()}
+        mock_db.funds.find_one.return_value = {
+            "id": "1234",
+            "name": "Test Fund",
+            "_id": MagicMock()
+        }
         fund = self.repository.get_fund("1234")
         self.assertEqual(fund["id"], "1234")
         self.assertIn("_id", fund)
@@ -60,7 +66,9 @@ class TestMongoFundRepository(unittest.TestCase):
 
     @patch('app.repositories.mongo_fund_repository.db')
     def test_get_fund_PyMongoError(self, mock_db):
-        mock_db.funds.find_one.side_effect = PyMongoError(DataBaseError.ERROR_DB_CONNECTION)
+        mock_db.funds.find_one.side_effect = PyMongoError(
+            DataBaseError.ERROR_DB_CONNECTION
+        )
         with self.assertRaises(HTTPException) as context:
             self.repository.get_fund("1234")
         self.assertEqual(context.exception.status_code, 500)
@@ -68,7 +76,13 @@ class TestMongoFundRepository(unittest.TestCase):
 
     @patch('app.repositories.mongo_fund_repository.db')
     def test_list_funds_success(self, mock_db):
-        mock_db.funds.find.return_value = [{"id": "1234", "name": "Test Fund", "_id": MagicMock()}]
+        mock_db.funds.find.return_value = [
+            {
+                "id": "1234",
+                "name": "Test Fund",
+                "_id": MagicMock()
+            }
+        ]
         funds = self.repository.list_funds()
         self.assertEqual(len(funds), 1)
         self.assertEqual(funds[0]["id"], "1234")
@@ -87,17 +101,18 @@ class TestMongoFundRepository(unittest.TestCase):
     def test_create_fund_unexpected_error_v2(self, mock_db):
         mock_db.funds.insert_one.side_effect = Exception("Unexpected error")
         fund = Fund(
-            name="test", 
-            minimum_investment_amount=100000, 
+            name="test",
+            minimum_investment_amount=100000,
             category="FPV"
         )
         mock_db.funds.create_fund.side_effect = Exception()
 
         with pytest.raises(HTTPException) as exc_info:
-           self.repository.create_fund(fund)
+            self.repository.create_fund(fund)
 
         assert exc_info.value.status_code == 500
         assert "Unexpected error" in exc_info.value.detail
+
 
 if __name__ == '__main__':
     unittest.main()

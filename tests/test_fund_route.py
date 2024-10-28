@@ -14,14 +14,23 @@ client = TestClient(app)
 def mock_repository():
     return MagicMock(spec=FundRepository)
 
+
 # Parchear el servicio para que use el repositorio simulado
 @pytest.fixture(autouse=True)
 def patch_fund_service(mock_repository):
-    with patch('app.routers.fund.fund_service', new=FundService(repository=mock_repository)):
+    with patch('app.routers.fund.fund_service',
+               new=FundService(repository=mock_repository)):
         yield
 
+
 def test_create_fund(mock_repository):
-    # Mock the behavior of the repository to return a specific fund when a new fund is created
+    """_summary_
+    Mock the behavior of the repository to return a specific
+    fund when a new fund is created
+    Args:
+        mock_repository (_type_): _description_
+    """
+
     mock_repository.create_fund.return_value = "1"
     mock_repository.get_fund.return_value = {
         "id": "1",
@@ -37,6 +46,7 @@ def test_create_fund(mock_repository):
     })
 
     assert response.status_code == 200
+
 
 def test_get_fund(mock_repository):
     fund_id = "1"
@@ -55,6 +65,7 @@ def test_get_fund(mock_repository):
         "category": "FPV"
     }
     mock_repository.get_fund.assert_called_once_with(fund_id)
+
 
 def test_list_funds(mock_repository):
     mock_repository.list_funds.return_value = [
@@ -79,6 +90,7 @@ def test_list_funds(mock_repository):
     ]
     assert response.json() == expected_response
     mock_repository.list_funds.assert_called_once()
+
 
 def test_list_funds_empty(mock_repository):
     mock_repository.list_funds.return_value = []

@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .env
 htmlcov/
+claves_investment_fund.pem
+ec2
+ec2-user@52.14.212.18
+fastapi-mongo.tar

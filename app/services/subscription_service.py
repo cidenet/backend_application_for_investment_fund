@@ -9,6 +9,7 @@ from app.models.subscription import Subscription
 from app.models.transaction_history import TransactionHistory
 from app.utils.constants import (
     DataBaseError,
+    FundStatus,
     SubscriptionError,
     SubscriptionNotificationChannel,
     SuccessMessage,
@@ -87,7 +88,8 @@ def create_subscription(subscription: Subscription):
         # Check if the user is already subscribed to the fund
         existing_subscription = db.subscriptions.find_one({
             "user_id": subscription.user_id,
-            "fund_id": subscription.fund_id
+            "fund_id": subscription.fund_id,
+            "status": FundStatus.ACTIVE
         })
 
         if existing_subscription:
@@ -150,7 +152,8 @@ def create_subscription(subscription: Subscription):
 
         return {
             "detail": SuccessMessage.SUCCESS_SUBSCRIPTION,
-            "subscription_id": subscription_id
+            "subscription_id": subscription_id,
+            "new_capital_value": new_investment_capital
         }
 
     except HTTPException as e:
@@ -220,7 +223,10 @@ def cancel_subscription(subscription_id: str):
             str(subscription.get("subscription_notification_channel", "sin_canal"))
         )
 
-        return {"detail": SuccessMessage.SUCCESS_SUBSCRIPTION_CANCELLATION}
+        return {
+            "detail": SuccessMessage.SUCCESS_SUBSCRIPTION_CANCELLATION,
+            "new_capital_value": new_investment_capital
+        }
 
     except HTTPException as e:
         raise e
@@ -267,6 +273,48 @@ def list_subscriptions_with_users():
 
         result.append(subscription_with_user_and_fund)
     return result
+
+
+def list_subscriptions_by_user(user_id: str):
+    """
+    This function returns a list of subscriptions for a user.
+    Args: user_id (str): The user ID
+    Returns: A list of subscriptions for the user
+    """
+    try:
+        subscriptions = db.subscriptions.find({"user_id": user_id})
+        result = []
+        for subscription in subscriptions:
+            user = db.users.find_one({"id": subscription["user_id"]})
+            fund = db.funds.find_one({"id": subscription["fund_id"]})
+
+            # Convertir ObjectId a string
+            subscription["_id"] = str(subscription["_id"])
+            if user:
+                user["_id"] = str(user["_id"])
+                subscription["user"] = user
+            if fund:
+                fund["_id"] = str(fund["_id"])
+                subscription["fund"] = fund
+
+            # Encontrar la última transacción para la suscripción
+            transaction = db.transaction_history.find_one(
+                {"subscription_id": subscription["id"]},
+                sort=[("timestamp", -1)]
+            )
+            if transaction:
+                subscription["transaction_timestamp"] = DateUtils.format_datetime(
+                    transaction["timestamp"]
+                )
+
+            # Eliminar user_id y fund_id de la suscripción
+            subscription.pop("user_id", None)
+            subscription.pop("fund_id", None)
+
+            result.append(subscription)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def get_user_transactions(user_id: str):

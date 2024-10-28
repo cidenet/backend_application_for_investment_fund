@@ -96,3 +96,48 @@ pip install python-dotenv
 # AWS LIBS
 pip install fastapi boto3 python-dotenv
 pip install boto3
+
+# CALIDAD DEL CODIGO
+pip install flake8
+
+# CORS:
+pip install fastapi-cors
+
+
+# generacion del requirement:
+pip freeze > requirements.txt
+
+--------------------------------
+
+# Despliegue AWS EC2:
+
+- Ir a la carpeta donde está el archivo Dockerfile
+- Crear la imagen de Docker:
+docker build -t fastapi-mongo .
+- Listar las imágenes de Docker:
+docker images ps
+- guardar la imagen en un zip:
+docker save -o fastapi-mongo.tar fastapi-mongo
+
+- enviar imagen comprimida:
+ scp -i "claves_investment_fund.pem" fastapi-mongo.tar ec2-user@52.14.212.18:~/
+ scp -i "claves_investment_fund.pem" .env ec2-user@52.14.212.18:~/
+
+
+- cargar la imagen en docker:
+docker load -i fastapi-mongo.tar
+
+- Ejecutar la imagen:
+- local
+docker run -d -p 8000:8000 --env-file .env fastapi-mongo
+- prod
+docker run -d -p 8000:8000 --env-file /home/ec2-user/.env fastapi-mongo
+
+- cargar variables de entorno:
+export $(cat /home/ec2-user/.env | xargs)
+
+docker stop 79328db21577
+
+- verificar que este detenido:
+docker ps -a
+
