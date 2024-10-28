@@ -1,10 +1,125 @@
-# cloudformation.yaml
+AWSTemplateFormatVersion: '2010-09-09'
 Resources:
-  MyEC2Instance:
-    Type: "AWS::EC2::Instance"
+  # S3 Bucket for frontend app
+  AppBucket:
+    Type: AWS::S3::Bucket
     Properties:
-      InstanceType: "t2.micro"
-      ImageId: "ami-0c55b159cbfafe1f0"  # Amazon Linux 2 AMI
-      KeyName: "my-key-pair"
-      SecurityGroups:
-        - "default"
+      BucketName: !Sub 'investment-fund-jdiaz-app-bucket'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false              
+
+  # Bucket Policy for Public Access
+  AppBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AppBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub '${AppBucket.Arn}/*'
+
+  # IAM Role for EC2
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: EC2InstanceS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource: '*'
+
+  # IAM Instance Profile for EC2 Role
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # Security Group for EC2 Instance
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH, HTTP, and MongoDB access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # Allow SSH access
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0  # HTTP access for the application
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0  # FastAPI access          
+        - IpProtocol: tcp
+          FromPort: 27017
+          ToPort: 27017
+          CidrIp: 0.0.0.0/0  # MongoDB access
+
+  # EC2 Instance with Docker for Spring Boot and MongoDB using Docker Compose
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro  # Free-tier eligible
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: 
+        !Ref EC2InstanceProfile
+      ImageId: ami-050cd642fd83388e4  # Amazon Linux 2 AMI (adjust based on region)
+      KeyName: claves_investment_fund # Replace with your key pair name
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          # Actualizar e instalar Docker
+          yum update -y
+          yum install -y docker
+          service docker start
+          usermod -a -G docker ec2-user
+
+          # Instalar Docker Compose
+          sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+
+          # Crear directorio para la aplicación
+          mkdir -p /home/ec2-user/app
+          cd /home/ec2-user/app
+
+Outputs:
+  EC2PublicIP:
+    Description: IP pública de la instancia EC2 para acceso a la aplicación Fast API Python
+    Value: !GetAtt EC2Instance.PublicIp
+
+  S3BucketURL:
+    Value: !GetAtt 
+      - AppBucket
+      - WebsiteURL
+    Description: Static website URL
